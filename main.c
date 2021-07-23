@@ -3,14 +3,28 @@
 #include <stdbool.h>
 #include <SDL2/SDL.h>
 
-#define _8B unsigned char
-#define _16B unsigned short
+#define _1B 	bool
+#define _8B 	unsigned char
+#define _16B 	unsigned short
 
-#define WINDOW_WIDTH 640
-#define WINDOW_HEIGHT 320
+#define WINDOW_WIDTH 	640
+#define WINDOW_HEIGHT 	320
 
 
 SDL_Window *window;
+SDL_Renderer *renderer;
+
+
+_8B	memory[4096];	 	
+_16B 	opcode;			
+_8B	V[16]; 		// registers, only 0x0 - 0xE are used, 0xF is used as a flag
+_16B 	I; 		// address register
+_16B 	PC;
+	
+_16B	stack[16];
+_8B 	SP;		// stack pointer, points to top of stack
+	
+_1B 	gbuff[64*32]; 
 
 
 bool init_graphics(){
@@ -18,6 +32,7 @@ bool init_graphics(){
 		printf("SDL Failed to initalise: %s\n", SDL_GetError());
 		return false;	
 	}
+
 	
 	window = SDL_CreateWindow("chip8emu",
 				SDL_WINDOWPOS_UNDEFINED,
@@ -25,37 +40,49 @@ bool init_graphics(){
 				WINDOW_WIDTH,
 				WINDOW_HEIGHT,
 				0);
-
+	
 	if(window == NULL){
 		printf("SDL window failed to initalise: %s\n", SDL_GetError());
 		return false;
 	}
-	
+
+	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+	if(renderer == NULL){
+		printf("SDL renderer failed to initialise: %s\n", SDL_GetError());
+	}
+
+	SDL_RenderSetLogicalSize(renderer, 64, 32);
+
+	SDL_SetRenderDrawColor(renderer, 0,0,0,0);
+	SDL_RenderClear(renderer);		
 	
 
 	return true;
 }
 
 void destroy_graphics(){
+	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
 	SDL_Quit();
+}
+
+void render_gbuff(){
+	int pixel;
+	for(int i = 0; i < 64; i++){
+		for(int j = 0; j < 32; j++){
+			pixel = gbuff[i+j*64] * 255;	
+			SDL_SetRenderDrawColor(renderer, pixel, pixel, pixel, pixel);
+			SDL_RenderDrawPoint(renderer, i, j); 
+		}
+	}
+	SDL_RenderPresent(renderer);
 }
 
 
 int main()
 {
-	_8B	memory[4096];	 	
-	_16B 	opcode;			
-	_8B	V[16]; 		// registers, only 0x0 - 0xE are used, 0xF is used as a flag
-	_16B 	I; 		// address register
-	_16B 	PC;
 	
-	_16B	stack[16];
-	_8B 	SP;		// stack pointer, points to top of stack
-	
-	_8B 	gbuff[64*32]; 	// graphical buffer needs to be interpreted by SDL	
-	
-	_8B 	fontset[80] =
+	_8B fontset[80] =
 	{ 
   	0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
   	0x20, 0x60, 0x20, 0x20, 0x70, // 1
@@ -72,18 +99,20 @@ int main()
   	0xF0, 0x80, 0x80, 0x80, 0xF0, // C
   	0xE0, 0x90, 0x90, 0x90, 0xE0, // D
   	0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
- 	 0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+ 	0xF0, 0x80, 0xF0, 0x80, 0x80  // F
 	}; 
 	
-	// move fontset into interpreter part of the memory
-	for(int i = 0; i < 80; i++){
-		memory[i] = fontset[i];	
-	}
+	// load fontset into interpreter part of the memory
+	memcpy(memory, fontset, 80);
  
 	if(!init_graphics())
 		return 1;
-	int c;	
-	c = getchar();	
+	for(int i = 0; i < 32*64; i++){
+		gbuff[i] = 1;
+		render_gbuff();
+		SDL_Delay(15);
+	}
+
 
 	destroy_graphics();	
 	return 0;
