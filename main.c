@@ -15,17 +15,11 @@ SDL_Window *window;
 SDL_Renderer *renderer;
 
 
-_8B	memory[4096];	 	
-_16B 	opcode;			
-_8B	V[16]; 		// registers, only 0x0 - 0xE are used, 0xF is used as a flag
-_16B 	I; 		// address register
-_16B 	PC;
-	
-_16B	stack[16];
-_8B 	SP;		// stack pointer, points to top of stack
 	
 _1B 	gbuff[64*32]; 
 
+_8B 	delay_timer;
+_8B	sound_timer;
 
 bool init_graphics(){
 	if(SDL_Init(SDL_INIT_VIDEO) != 0){
@@ -79,10 +73,31 @@ void render_gbuff(){
 }
 
 
+
+Uint32 last = 0;
+void decrement_timers(){
+	Uint32 current = SDL_GetTicks();
+	if(current-last >= 1000/60){		
+		delay_timer -= (delay_timer > 0);
+		sound_timer -= (sound_timer > 0);
+		last = current;
+	}
+}
+
+
 int main()
 {
 	
-	_8B fontset[80] =
+	_8B	memory[4096];	 	
+	_16B 	opcode;			
+	_8B	V[16]; 		// registers, only 0x0 - 0xE are used, 0xF is used as a flag
+	_16B 	I; 		// address register
+	_16B 	PC;
+	
+	_16B	stack[16];
+	_8B 	SP;		// stack pointer, points to top of stack
+
+	_8B 	fontset[80] =
 	{ 
   	0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
   	0x20, 0x60, 0x20, 0x20, 0x70, // 1
@@ -107,10 +122,26 @@ int main()
  
 	if(!init_graphics())
 		return 1;
-	for(int i = 0; i < 32*64; i++){
-		gbuff[i] = 1;
-		render_gbuff();
-		SDL_Delay(15);
+
+
+	PC = 0x200;
+	opcode = 0;
+	memset(V, 0, 16);
+	SP = 0;
+	I = 0;
+
+
+	SDL_Event event;
+	for(;;){
+		while(SDL_PollEvent(&event)){
+			switch(event.type){
+			case SDL_QUIT:
+				return 0;
+			}		
+		}		
+		
+		
+		decrement_timers();		
 	}
 
 
