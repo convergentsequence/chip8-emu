@@ -181,6 +181,10 @@ int main()
 	Uint32 lastCycleTime = 0;
 	Uint32 currentCycleTime;
 
+	int sx;
+	int sy;
+	int sn;
+
 	SDL_Event event;
 	for(;;){
 		while(SDL_PollEvent(&event)){
@@ -192,7 +196,6 @@ int main()
 		
 		currentCycleTime = SDL_GetTicks();
 		if(currentCycleTime - lastCycleTime >= 1000/cycles_per_second){
-
 			opcode = memory[PC] << 8 | memory[PC+1];
 			if(!opcode){
 				printf("Exiting, PC: %d, OPCODE: 0x%4X\n", PC, opcode);
@@ -213,11 +216,12 @@ int main()
 					SP--;
 					break;
 				}
+
 				break;
 
 			case 0x1000: // 0x1NNN - jump to location NNN
 				verbose_opcode(PC, opcode, "Jumping to location: %03X", opcode & 0x0FFF);
-				PC = opcode & 0x0FFF;
+				PC = opcode & 0xFFF;
 				break;
 			
 			case 0x2000: // 0x2NNN - jump to subroutine at address NNN
@@ -301,17 +305,17 @@ int main()
 				break;
 			
 			case 0xA000: // 0xANNN - Put NNN into I
-				verbose_opcode(PC, opcode, "Putting %3X into I", opcode & 0xFFF);
+				verbose_opcode(PC, opcode, "Putting %03X into I", opcode & 0xFFF);
 				I = opcode & 0xFFF;
 				break;
 			
 			case 0xB000: // 0xBNNN - Jump to address NN plus register V0
-				verbose_opcode(PC, opcode, "Jumping to address %3X + V0", opcode & 0xFFF);
+				verbose_opcode(PC, opcode, "Jumping to address %03X + V0", opcode & 0xFFF);
 				PC = (opcode & 0xFFF) + V[0];
 				break;
 			
 			case 0xC000: // 0xCXKK - Set VX to (random number between 0 - 255) & KK
-				verbose_opcode(PC, opcode, "Setting V%d to random number & %2X", (opcode & 0xF00) / 0x100, opcode & 0xFF);
+				verbose_opcode(PC, opcode, "Setting V%d to random number & %02X", (opcode & 0xF00) / 0x100, opcode & 0xFF);
 				V[ (opcode & 0xF00) / 0x100 ] = (rand() % 255) & (opcode & 0xFF);
 				break;
 
@@ -322,13 +326,80 @@ int main()
 			*	The interpreter reads n bytes from memory, starting at the address stored in I. These bytes are then displayed as sprites on screen at coordinates (Vx, Vy). Sprites are XORed onto the existing screen.
 			*	If this causes any pixels to be erased, VF is set to 1, otherwise it is set to 0. If the sprite is positioned so part of it is outside the coordinates of the display, 
 			*	it wraps around to the opposite side of the screen.
+			*	
+			*	A sprite is 8 bits of length and n bits of height
 			*
 			*/
 
 			case 0xD000: 
 				verbose_opcode(PC, opcode, "Drawing sprite %d at coordinates %d %d", opcode & 0xF, (opcode & 0xF00) / 0x100, (opcode & 0xF0) / 0x10);
+				
+				sx = (opcode & 0xF00) / 0x100;
+				sy = (opcode & 0xF0) / 0x10;
+				sn = opcode & 0xF;
+
+				for(int i = 0; i < sn; i++){
+					_8B sprite_line = memory[I+i*8];
+					for(int j = 0; j < 8; j++){
+						int ploc = ((sy+i) % 32)*64+((sx+j) % 64);
+						V[15] = gbuff[ploc] == ((sprite_line >> (7-j)) & 1);
+						gbuff[ploc] ^= 1;
+					}	
+				}
+
 				break;
 
+			case 0xE000: // opcodes starting with 0xE
+				switch(opcode & 0xFF){ // check opcode endings
+				case 0x9E: // 0xEx9E - skip next instruction if key in Vx is pressed
+					verbose_opcode(PC, opcode, "Skip next instruction if key in V%d (%X) is pressed", (opcode & 0xF00) / 0x100, V[(opcode & 0xF00) / 0x100] );
+					break;	
+				case 0xA1: // 0xExA1 - skip next instruction if key in Vx is not pressed
+					verbose_opcode(PC, opcode, "Skip the next instruction if the key in V%d (%X) is not pressed",  (opcode & 0xF00) / 0x100, V[(opcode & 0xF00) / 0x100] );
+					break;
+				}
+				break;
+
+			case 0xF000: // opcodes starting with 0xF
+				switch(opcode & 0xFF){
+				case 0x07: // 0xFx07 - put delay timer into Vx
+					verbose_opcode(PC, opcode, "Putting value of delay timer into V%d", (opcode & 0xF00) / 0x100);
+					V[ (opcode & 0xF00) / 0x100 ] = delay_timer;
+					break;
+
+				case 0x0A: // 0xFx0A - Wait for key press store the value of the key in Vx
+					verbose_opcode(PC, opcode, "Waiting for key press and storing the value of key in V%d", (opcode & 0xF00) / 0x100);
+					break;
+				
+				case 0x15: // 0xFx15 - Set delay timer to value of Vx
+					verbose_opcode(PC, opcode, "Setting delay timer value to V%d", (opcode & 0xF00) / 0x100);
+					delay_timer = V[ (opcode & 0xF00) / 0x100 ];
+					break;
+				
+				case 0x18: // 0xFx18 - set timer value to Vx
+					verbose_opcode(PC, opcode, "Setting sound timer value to V%d", (opcode & 0xF00) / 0x100);
+					sound_timer = V[ (opcode & 0xF00) / 0x100 ] ;
+					break;
+
+				case 0x1E: // 0xFx1E - value of Vx is added to I
+					verbose_opcode(PC, opcode, "Adding V%d to I", (opcode & 0xF00) / 0x100);
+					I += V[ (opcode & 0xF00) / 0x100 ];
+					break;
+
+				case 0x29: // 0xFx29 - the value of I is set to sprite location of digit Vx
+					verbose_opcode(PC, opcode, "I is set to sprite location of %X", (opcode & 0x100) / 0x100);
+					I = memory[((opcode & 0x100) / 0x100) * 5];
+					break;
+				
+				case 0x33: // 0xFx33 - store BCD represebtation of Vx in I
+					verbose_opcode(PC, opcode, "Storing BCD of V%d in I", (opcode & 0x100) / 0x100);
+					break;
+
+				default:
+					verbose_opcode(PC, opcode, "Unkown opcode");
+				}
+				
+				break;
 			default:
 				verbose_opcode(PC, opcode, "Unkown opcode");
 			
