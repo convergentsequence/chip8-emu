@@ -74,13 +74,22 @@ void render_gbuff(){
 
 
 
-Uint32 last = 0;
-void decrement_timers(){
-	Uint32 current = SDL_GetTicks();
-	if(current-last >= 1000/60){		
-		delay_timer -= (delay_timer > 0);
-		sound_timer -= (sound_timer > 0);
-		last = current;
+static inline void decrement_timers(){
+	delay_timer -= (delay_timer > 0);
+	sound_timer -= (sound_timer > 0);
+}
+
+Uint32 last60hz = 0;
+Uint32 current60hz;
+static inline void _60hz(int currentCycleTime){
+	current60hz = currentCycleTime;
+	if(current60hz - last60hz >= 1000/60){
+
+
+		decrement_timers();
+						
+
+		last60hz = current60hz;
 	}
 }
 
@@ -131,6 +140,10 @@ int main()
 	I = 0;
 
 
+	int cycles_per_second = 144;
+	Uint32 lastCycleTime = 0;
+	Uint32 currentCycleTime;
+
 	SDL_Event event;
 	for(;;){
 		while(SDL_PollEvent(&event)){
@@ -140,8 +153,17 @@ int main()
 			}		
 		}		
 		
+		Uint32 currentCyleTime = SDL_GetTicks();
+		if(currentCycleTime - lastCycleTime >= cycles_per_second/1000){
+			
+			
+
+			lastCycleTime = currentCycleTime;
+		}
+
 		
-		decrement_timers();		
+		_60hz(currentCycleTime);	
+		SDL_Delay(0);		
 	}
 
 
