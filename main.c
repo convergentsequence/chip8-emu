@@ -253,52 +253,50 @@ int main()
 
 			case 0x8000: // opcodes that start with 8
 				switch(opcode & 0x00F){ // check opcode endings
-					case 0: // 0x8XY0 - move register VY to register VX
-						verbose_opcode(PC, opcode, "Moving V%d into V%D", (opcode & 0xF0) / 0x10, (opcode & 0xF00) / 0x100);
-						V[ (opcode & 0xF00) / 0x100 ] = V [ (opcode & 0xF0) / 0x10 ];
-						break;
-					case 1: // 0x8XY1 - stores the value of VX | VY into VX
-						verbose_opcode(PC, opcode, "Setting V%1$d to V%1$d | V%2$d", (opcode & 0xF00) / 0x100, (opcode & 0xF0) / 0x10);
-						V[ (opcode & 0xF00) / 0x100 ] |= V[ (opcode & 0xF0) / 0x10 ];
-						break;
-					case 2: // 0x8XY2 - add value of VY to VX
-						verbose_opcode(PC, opcode, "Add the value of V%d to V%d", (opcode & 0xF0) / 0x10, (opcode & 0xF00) / 0x100);
-						V[ (opcode & 0xF00) / 0x100 ] += V[ (opcode & 0xF0) / 0x10 ];
-						break;
-					case 3: // 0x8XY3 - XOR VY and X store in VX
-						verbose_opcode(PC, opcode, "Setting V%1$d to V%1$d XOR V%2$d", (opcode & 0xF00) / 0x100, (opcode & 0xF0) / 0x10);
-						V[ (opcode & 0xF00) / 0x100 ] ^= V[ (opcode & 0xF0) / 0x10 ];
-						break;
-					case 4: // 0x8XY4 - Add VY to VX store carry in V15
-						verbose_opcode(PC, opcode, "Adding V%d to V%d and storing the carry in V15", (opcode & 0xF0) / 0x10, (opcode & 0xF00) / 0x100);
-						int sum = V[ (opcode & 0xF00) / 0x100 ] + V[ (opcode & 0xF0) / 0x10 ];
-						V[15] = sum > 255 ? sum - 255 : 0;
-						V[ (opcode & 0xF00) / 0x100 ]  = sum;
-						break;
-					case 5: // 0x8XY5 - Subtract VY from VX and store the borrow in V15
-						verbose_opcode(PC, opcode, "Subtracting V%d from V%d and storing the borrow in V15", (opcode & 0xF0) / 0x10, (opcode & 0xF00) / 0x100);
-						int sub =  V[ (opcode & 0xF00) / 0x100 ] - V[ (opcode & 0xF0) / 0x10];
-						V[15] = sub < 0;
-						V[ (opcode & 0xF00) / 0x100 ] = sub;
-						break;
-					case 6: // 0x8X06 - Shift VX to right, first bit goes to V[15]
-						verbose_opcode(PC, opcode, "Shiting V%d to the right, storing 1st bit in V15", (opcode & 0xF00) / 0x100);
-						V[ (opcode & 0xF00) / 0x100 ] >>= 1;
-						V[15] = V[ (opcode & 0xF00) / 0x100 ] & 1;
-						break;
-					case 7: // 0x8XY7 - Subtract VX from VY result stored in VX
-						verbose_opcode(PC, opcode, "Subtracting V%d from V%d storing the borrow in V15", (opcode & 0xF00) / 0x100, (opcode & 0xF0) / 0x10);
-						int sub_2 = V[ (opcode & 0xF0) / 0x10 ] - V[ (opcode & 0xF00) / 0x100 ];
-						V[15] = sub_2 < 0;
-						V[ (opcode & 0xF00) / 0x100 ] = sub_2;
-						break;
-					case 0xE: // 0x8X0E - Shift VX to left,most significant bit goes to V15
-						verbose_opcode(PC, opcode, "Shifting VX to left storing the most significant bit in V15", (opcode & 0xF00) / 0x100);
-						V[15] = V[ (opcode & 0xF00) / 0x100 ] >> 7;
-						V[ (opcode & 0xF00) / 0x100 ] <<= 1;
-						break;
-				}
-				
+				case 0: // 0x8XY0 - move register VY to register VX
+					verbose_opcode(PC, opcode, "Moving V%d into V%D", (opcode & 0xF0) / 0x10, (opcode & 0xF00) / 0x100);
+					V[ (opcode & 0xF00) / 0x100 ] = V [ (opcode & 0xF0) / 0x10 ];
+					break;
+				case 1: // 0x8XY1 - stores the value of VX | VY into VX
+					verbose_opcode(PC, opcode, "Setting V%1$d to V%1$d | V%2$d", (opcode & 0xF00) / 0x100, (opcode & 0xF0) / 0x10);
+					V[ (opcode & 0xF00) / 0x100 ] |= V[ (opcode & 0xF0) / 0x10 ];
+					break;
+				case 2: // 0x8XY2 - add value of VY to VX
+					verbose_opcode(PC, opcode, "Add the value of V%d to V%d", (opcode & 0xF0) / 0x10, (opcode & 0xF00) / 0x100);
+					V[ (opcode & 0xF00) / 0x100 ] += V[ (opcode & 0xF0) / 0x10 ];
+					break;
+				case 3: // 0x8XY3 - XOR VY and X store in VX
+					verbose_opcode(PC, opcode, "Setting V%1$d to V%1$d XOR V%2$d", (opcode & 0xF00) / 0x100, (opcode & 0xF0) / 0x10);
+					V[ (opcode & 0xF00) / 0x100 ] ^= V[ (opcode & 0xF0) / 0x10 ];
+					break;
+				case 4: // 0x8XY4 - Add VY to VX store carry in V15
+					verbose_opcode(PC, opcode, "Adding V%d to V%d and storing the carry in V15", (opcode & 0xF0) / 0x10, (opcode & 0xF00) / 0x100);
+					int sum = V[ (opcode & 0xF00) / 0x100 ] + V[ (opcode & 0xF0) / 0x10 ];
+					V[15] = sum > 255 ? sum - 255 : 0;
+					V[ (opcode & 0xF00) / 0x100 ]  = sum;
+					break;
+				case 5: // 0x8XY5 - Subtract VY from VX and store the borrow in V15
+					verbose_opcode(PC, opcode, "Subtracting V%d from V%d and storing the borrow in V15", (opcode & 0xF0) / 0x10, (opcode & 0xF00) / 0x100);
+					int sub =  V[ (opcode & 0xF00) / 0x100 ] - V[ (opcode & 0xF0) / 0x10];
+					V[15] = sub < 0;
+					V[ (opcode & 0xF00) / 0x100 ] = sub;
+					break;
+				case 6: // 0x8X06 - Shift VX to right, first bit goes to V[15]
+					verbose_opcode(PC, opcode, "Shiting V%d to the right, storing 1st bit in V15", (opcode & 0xF00) / 0x100);
+					V[ (opcode & 0xF00) / 0x100 ] >>= 1;
+					V[15] = V[ (opcode & 0xF00) / 0x100 ] & 1;
+					break;
+				case 7: // 0x8XY7 - Subtract VX from VY result stored in VX
+					verbose_opcode(PC, opcode, "Subtracting V%d from V%d storing the borrow in V15", (opcode & 0xF00) / 0x100, (opcode & 0xF0) / 0x10);
+					int sub_2 = V[ (opcode & 0xF0) / 0x10 ] - V[ (opcode & 0xF00) / 0x100 ];
+					V[15] = sub_2 < 0;
+					V[ (opcode & 0xF00) / 0x100 ] = sub_2;
+					break;
+				case 0xE: // 0x8X0E - Shift VX to left,most significant bit goes to V15
+					verbose_opcode(PC, opcode, "Shifting VX to left storing the most significant bit in V15", (opcode & 0xF00) / 0x100);
+					V[15] = V[ (opcode & 0xF00) / 0x100 ] >> 7;
+					V[ (opcode & 0xF00) / 0x100 ] <<= 1;
+					break;}
 
 				break;
 			
