@@ -86,8 +86,8 @@ static inline void _60hz(int currentCycleTime){
 	if(current60hz - last60hz >= 1000/60){
 
 
-		decrement_timers();
-						
+		decrement_timers();			
+		render_gbuff();
 
 		last60hz = current60hz;
 	}
@@ -153,10 +153,14 @@ int main()
 			}		
 		}		
 		
-		Uint32 currentCyleTime = SDL_GetTicks();
-		if(currentCycleTime - lastCycleTime >= cycles_per_second/1000){
-			
-			
+		currentCycleTime = SDL_GetTicks();
+		if(currentCycleTime - lastCycleTime >= 1000/cycles_per_second){
+			static a = 0;
+			if(a > 144){
+				a = 0;
+				printf("+1\n");
+			}
+			a++;			
 
 			lastCycleTime = currentCycleTime;
 		}
