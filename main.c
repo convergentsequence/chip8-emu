@@ -15,7 +15,7 @@
 
 #define GBUFF_SIZE 32*64
 
-#define VERBOSE_OPCODES 1
+#define VERBOSE_OPCODES 0
 
 SDL_Window *window;
 SDL_Renderer *renderer;
@@ -177,13 +177,16 @@ int main()
 	I = 0;
 
 
-	int cycles_per_second = 144;
+	int cycles_per_second = 500;
 	Uint32 lastCycleTime = 0;
 	Uint32 currentCycleTime;
 
 	int sx;
 	int sy;
 	int sn;
+
+	bool keystates[16];
+	memset(keystates, 0, 16 * sizeof(bool));
 
 	SDL_Event event;
 	for(;;){
@@ -246,13 +249,13 @@ int main()
 				break;
 
 			case 0x6000: // 0x6XRR - move constant RR into V[X]
-				verbose_opcode(PC, opcode, "Moving 0x%X into V%d", (opcode & 0xFF0) / 0x10, opcode & 0xF);
-				V[ opcode & 0xF ] = (opcode & 0xFF0) / 0x10;
+				verbose_opcode(PC, opcode, "Moving 0x%X into V%d", opcode & 0xFF, (opcode & 0xF00) / 0x100);
+				V[ (opcode & 0xF00) / 0x100 ] = opcode & 0xFF;
 				break;
 				
-			case 0x7000: // 0x7RRX - add RR to value of V[X]
-				verbose_opcode(PC, opcode, "Adding %d to V%d", (opcode & 0xFF0) / 0x10, opcode & 0xF);
-				V[ opcode & 0xF ] += (opcode & 0xFF0) / 0x10;
+			case 0x7000: // 0x7XRR - add RR to value of V[X]
+				verbose_opcode(PC, opcode, "Adding %X to V%d", (opcode & 0xFF), (opcode & 0xF00) / 0x100);
+				V[ (opcode & 0xF00) / 0x100 ] += opcode & 0xFF;
 				break;
 
 			case 0x8000: // opcodes that start with 8
@@ -300,7 +303,9 @@ int main()
 					verbose_opcode(PC, opcode, "Shifting VX to left storing the most significant bit in V15", (opcode & 0xF00) / 0x100);
 					V[15] = V[ (opcode & 0xF00) / 0x100 ] >> 7;
 					V[ (opcode & 0xF00) / 0x100 ] <<= 1;
-					break;}
+					break;
+			
+				}
 
 				break;
 			
@@ -332,7 +337,7 @@ int main()
 			*/
 
 			case 0xD000: 
-				verbose_opcode(PC, opcode, "Drawing sprite %d at coordinates %d %d", opcode & 0xF, (opcode & 0xF00) / 0x100, (opcode & 0xF0) / 0x10);
+				verbose_opcode(PC, opcode, "Drawing sprite with length %d memory location %X at coordinates %d %d", opcode & 0xF, I ,(opcode & 0xF00) / 0x100, (opcode & 0xF0) / 0x10);
 				
 				sx = (opcode & 0xF00) / 0x100;
 				sy = (opcode & 0xF0) / 0x10;
@@ -393,10 +398,20 @@ int main()
 				
 				case 0x33: // 0xFx33 - store BCD represebtation of Vx in I
 					verbose_opcode(PC, opcode, "Storing BCD of V%d in I", (opcode & 0x100) / 0x100);
+					memory[I] = V[ (opcode & 0xF00) / 0x100 ] / 100;
+					memory[I+1] = (V[ (opcode & 0xF00) / 0x100 ] % 100) / 10;
+					memory[I+2] =  V[ (opcode & 0xF00) / 0x100 ] % 10;
 					break;
-
-				default:
-					verbose_opcode(PC, opcode, "Unkown opcode");
+				
+				case 0x55: // 0xFx55 - store the value of registers 0 to X into memory at I
+					verbose_opcode(PC, opcode, "Store the value of registers V0 to V%d into memory at I", (opcode & 0xF00) / 0x100);
+					memcpy(memory, V, sizeof(_8B) * ((opcode & 0xF00) / 0x100));
+					break;
+				
+				case 0x65: // 0xFx65
+					verbose_opcode(PC, opcode, "Read registers V0 to V%d from I", (opcode & 0xF00) / 0x100);
+					memcpy(V, memory, sizeof(_8B) * ((opcode & 0xF00) / 0x100));
+					break;
 				}
 				
 				break;
