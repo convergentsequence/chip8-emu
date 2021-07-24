@@ -113,7 +113,7 @@ static inline void verbose_opcode(_16B PC, _16B opcode, char* message, ...){
 	vsnprintf(buffer, 255, message, args);
 	va_end(args);
 
-	printf("%03X: %04X %s\n", PC, opcode, buffer);
+	printf("%03X: %04X %s\n", PC-2, opcode, buffer);
 	#endif
 }
 
@@ -193,11 +193,12 @@ int main()
 		if(currentCycleTime - lastCycleTime >= 1000/cycles_per_second){
 
 			opcode = memory[PC] << 8 | memory[PC+1];
-			PC+=2;
-			printf("%X\n", opcode);
-			if(!opcode)
+			if(!opcode){
+				printf("Exiting, PC: %d, OPCODE: 0x%4X\n", PC, opcode);
 				exit_emu();
-		
+			}	
+			PC+=2;
+
 			switch(opcode & 0xF000){
 			case 0: // opcodes starting with 0
 				switch(opcode & 0x00FF){
@@ -206,24 +207,95 @@ int main()
 					memset(gbuff, 0, GBUFF_SIZE);
 					break;
 				case 0xEE: // 0x00EE - return from subroutine call
-					PC = stack[SP-1];
 					verbose_opcode(PC, opcode, "Returning from subroutine to: %03X",stack[SP-1]);
+					PC = stack[SP-1];
 					SP--;
 					break;
 				}
 				break;
 
-			case 1: // 0x1NNN - jump to location NNN
-				_16B target_location = opcode & 0x0FFF;
-				PC = target_location;
-				verbose_opcode(PC, opcode, "Jumping to location: %03X", target_location);
+			case 0x1000: // 0x1NNN - jump to location NNN
+				verbose_opcode(PC, opcode, "Jumping to location: %03X", opcode & 0x0FFF);
+				PC = opcode & 0x0FFF;
 				break;
-			case 2: // 0x2NNN - jump to subroutine at address NNN
-				_16B target_subroutine = opcode & 0x0FFF;
+			
+			case 0x2000: // 0x2NNN - jump to subroutine at address NNN
+				verbose_opcode(PC, opcode, "Jumping to subroutine: %03X", opcode & 0xFFF);
 				stack[(SP++)-1] = PC+2;
-				PC = target_location;
-				verbose_opcode(PC, opcode, "Jumping to subroutine: %03X", target_subroutine);
+				PC = opcode & 0xFFF;
 				break;
+			
+			case 0x3000: // 0x3XRR - skip next instruction if V[X] == 0xRR 
+				verbose_opcode(PC, opcode, "Skipping next instruction if V%d == %X", (opcode & 0xF00) / 0x100,  (opcode & 0xFF)); 
+				PC += 2 * ( V[ (opcode & 0xF00) / 0x100 ] == (opcode & 0xFF) );
+				break;
+			
+			case 0x4000: // 0x4XRR - skip next intruction if V[X] != 0xRR
+				verbose_opcode(PC, opcode, "Skipping next instruction if V%d != %X",  (opcode & 0xF00) / 0x100 ,  (opcode & 0xFF)); 
+				PC += 2 * ( V[ (opcode & 0xF00) / 100 ] != (opcode & 0xFF)  );
+				break;
+			
+			case 0x5000: // 0x5XY0 - skip next instruction if V[X] == V[Y]
+				verbose_opcode(PC, opcode, "Skipping next instruction if V%d != V%d", (opcode & 0xF00) / 0x100, (opcode & 0xF0) / 0x10 );
+				PC += 2 * ( V[ (opcode & 0xF00) / 0x100  ] == V[ (opcode & 0xF0) / 0x10 ] );
+				break;
+
+			case 0x6000: // 0x6XRR - move constant RR into V[X]
+				verbose_opcode(PC, opcode, "Moving 0x%X into V%d", (opcode & 0xFF0) / 0x10, opcode & 0xF);
+				V[ opcode & 0xF ] = (opcode & 0xFF0) / 0x10;
+				break;
+				
+			case 0x7000: // 0x7RRX - add RR to value of V[X]
+				verbose_opcode(PC, opcode, "Adding %d to V%d", (opcode & 0xFF0) / 0x10, opcode & 0xF);
+				V[ opcode & 0xF ] += (opcode & 0xFF0) / 0x10;
+				break;
+
+			case 0x8000: // opcodes that start with 8
+				switch(opcode & 0x00F){ // check opcode endings
+					case 0: // 0x8XY0 - move register VY to register VX
+						verbose_opcode(PC, opcode, "Moving V%d into V%D", (opcode & 0xF0) / 0x10, (opcode & 0xF00) / 0x100);
+						V[ (opcode & 0xF00) / 0x100 ] = V [ (opcode & 0xF0) / 0x10 ];
+						break;
+					case 1: // 0x8XY1 - stores the value of VX | VY into VX
+						verbose_opcode(PC, opcode, "Setting V%1$d to V%1$d | V%2$d", (opcode & 0xF00) / 0x100, (opcode & 0xF0) / 0x10);
+						V[ (opcode & 0xF00) / 0x100 ] |= V[ (opcode & 0xF0) / 0x10 ];
+						break;
+					case 2: // 0x8XY2 - add value of VY to VX
+						verbose_opcode(PC, opcode, "Add the value of V%d to V%d", (opcode & 0xF0) / 0x10, (opcode & 0xF00) / 0x100);
+						V[ (opcode & 0xF00) / 0x100 ] += V[ (opcode & 0xF0) / 0x10 ];
+						break;
+					case 3: // 0x8XY3 - XOR VY and X store in VX
+						verbose_opcode(PC, opcode, "Setting V%1$d to V%1$d XOR V%2$d", (opcode & 0xF00) / 0x100, (opcode & 0xF0) / 0x10);
+						V[ (opcode & 0xF00) / 0x100 ] ^= V[ (opcode & 0xF0) / 0x10 ];
+						break;
+					case 4: // 0x8XY4 - Add VY to VX store carry in V15
+						verbose_opcode(PC, opcode, "Adding V%d to V%d and storing the carry in V15", (opcode & 0xF0) / 0x10, (opcode & 0xF00) / 0x100);
+						int sum = V[ (opcode & 0xF00) / 0x100 ] + V[ (opcode & 0xF0) / 0x10 ];
+						V[15] = sum > 255 ? sum - 255 : 0;
+						V[ (opcode & 0xF00) / 0x100 ]  = sum;
+						break;
+					case 5: // 0x8XY5 - Subtract VY from VX and store the borrow in V15
+						verbose_opcode(PC, opcode, "Subtracting V%d from V%d and stroing the borrow in V15", (opcode & 0xF0) / 0x10, (opcode & 0xF00) / 0x100);
+						int sub =  V[ (opcode & 0xF00) / 0x100 ] - V[ (opcode & 0xF0) / 0x10];
+						V[15] = sub < 0;
+						V[ (opcode & 0xF00) / 0x100 ] = sub;
+						break;
+					case 6: // 0x8X06 - Shift VX to right, first bit goes to V[15]
+						verbose_opcode(PC, opcode, "Shiting V%d to the right, storing 1st bit in V15", (opcode & 0xF00) / 0x100);
+						V[15] = V[ (opcode & 0xF00) / 0x100 ] & 0xF;
+						V[ (opcode & 0xF00) / 0x100 ] >>= 1;
+						break;
+
+						
+				}
+				
+
+				break;
+			
+
+			default:
+				verbose_opcode(PC, opcode, "Unkown opcode");
+			
 			}
 
 			lastCycleTime = currentCycleTime;
