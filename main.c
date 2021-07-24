@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdarg.h>
+#include <time.h>
 
 #include <SDL2/SDL.h>
 
@@ -120,7 +121,7 @@ static inline void verbose_opcode(_16B PC, _16B opcode, char* message, ...){
 int main()
 {
 
-	
+	srand(0);
 
 	_8B	memory[4096];	 	
 	_16B 	opcode;			
@@ -221,7 +222,7 @@ int main()
 			
 			case 0x2000: // 0x2NNN - jump to subroutine at address NNN
 				verbose_opcode(PC, opcode, "Jumping to subroutine: %03X", opcode & 0xFFF);
-				stack[(SP++)-1] = PC+2;
+				stack[(SP++)] = PC;
 				PC = opcode & 0xFFF;
 				break;
 			
@@ -275,23 +276,60 @@ int main()
 						V[ (opcode & 0xF00) / 0x100 ]  = sum;
 						break;
 					case 5: // 0x8XY5 - Subtract VY from VX and store the borrow in V15
-						verbose_opcode(PC, opcode, "Subtracting V%d from V%d and stroing the borrow in V15", (opcode & 0xF0) / 0x10, (opcode & 0xF00) / 0x100);
+						verbose_opcode(PC, opcode, "Subtracting V%d from V%d and storing the borrow in V15", (opcode & 0xF0) / 0x10, (opcode & 0xF00) / 0x100);
 						int sub =  V[ (opcode & 0xF00) / 0x100 ] - V[ (opcode & 0xF0) / 0x10];
 						V[15] = sub < 0;
 						V[ (opcode & 0xF00) / 0x100 ] = sub;
 						break;
 					case 6: // 0x8X06 - Shift VX to right, first bit goes to V[15]
 						verbose_opcode(PC, opcode, "Shiting V%d to the right, storing 1st bit in V15", (opcode & 0xF00) / 0x100);
-						V[15] = V[ (opcode & 0xF00) / 0x100 ] & 0xF;
 						V[ (opcode & 0xF00) / 0x100 ] >>= 1;
+						V[15] = V[ (opcode & 0xF00) / 0x100 ] & 1;
 						break;
-
-						
+					case 7: // 0x8XY7 - Subtract VX from VY result stored in VX
+						verbose_opcode(PC, opcode, "Subtracting V%d from V%d storing the borrow in V15", (opcode & 0xF00) / 0x100, (opcode & 0xF0) / 0x10);
+						int sub_2 = V[ (opcode & 0xF0) / 0x10 ] - V[ (opcode & 0xF00) / 0x100 ];
+						V[15] = sub_2 < 0;
+						V[ (opcode & 0xF00) / 0x100 ] = sub_2;
+						break;
+					case 0xE: // 0x8X0E - Shift VX to left,most significant bit goes to V15
+						verbose_opcode(PC, opcode, "Shifting VX to left storing the most significant bit in V15", (opcode & 0xF00) / 0x100);
+						V[15] = V[ (opcode & 0xF00) / 0x100 ] >> 7;
+						V[ (opcode & 0xF00) / 0x100 ] <<= 1;
+						break;
 				}
 				
 
 				break;
 			
+			case 0xA000: // 0xANNN - Put NNN into I
+				verbose_opcode(PC, opcode, "Putting %3X into I", opcode & 0xFFF);
+				I = opcode & 0xFFF;
+				break;
+			
+			case 0xB000: // 0xBNNN - Jump to address NN plus register V0
+				verbose_opcode(PC, opcode, "Jumping to address %3X + V0", opcode & 0xFFF);
+				PC = (opcode & 0xFFF) + V[0];
+				break;
+			
+			case 0xC000: // 0xCXKK - Set VX to (random number between 0 - 255) & KK
+				verbose_opcode(PC, opcode, "Setting V%d to random number & %2X", (opcode & 0xF00) / 0x100, opcode & 0xFF);
+				V[ (opcode & 0xF00) / 0x100 ] = (rand() % 255) & (opcode & 0xFF);
+				break;
+
+			/*
+			*
+			*	Dxyn - DRW Vx, Vy, nibble
+			*	Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision.
+			*	The interpreter reads n bytes from memory, starting at the address stored in I. These bytes are then displayed as sprites on screen at coordinates (Vx, Vy). Sprites are XORed onto the existing screen.
+			*	If this causes any pixels to be erased, VF is set to 1, otherwise it is set to 0. If the sprite is positioned so part of it is outside the coordinates of the display, 
+			*	it wraps around to the opposite side of the screen.
+			*
+			*/
+
+			case 0xD000: 
+				verbose_opcode(PC, opcode, "Drawing sprite %d at coordinates %d %d", opcode & 0xF, (opcode & 0xF00) / 0x100, (opcode & 0xF0) / 0x10);
+				break;
 
 			default:
 				verbose_opcode(PC, opcode, "Unkown opcode");

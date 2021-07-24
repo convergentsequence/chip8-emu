@@ -1,2 +1,4 @@
 chip8emu
 *.rom
+roms/
+*.ch8
