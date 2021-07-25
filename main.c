@@ -415,6 +415,7 @@ int main()
 					pressed = false;
 					while(!pressed){
 						while(SDL_PollEvent(&event)){
+							switch(event.type){
 							case SDL_KEYDOWN:
 								keycode = event.key.keysym.scancode;
 								if(keycode >= 4 && keycode <= 9){
@@ -422,7 +423,7 @@ int main()
 									pressed = true;
 								}
 								if(keycode >= 30 && keycode <= 38){
-									V[(opcode & 0xF00) / 0x100] = 1 + (opcode - 30);
+									V[(opcode & 0xF00) / 0x100] = 1 + (keycode - 30);
 									pressed = true;
 								}
 								if(keycode == 39){
@@ -432,7 +433,9 @@ int main()
 								break;
 							case SDL_QUIT:
 								exit_emu();
+							}
 						}
+						SDL_Delay(0);
 					}
 
 					break;
