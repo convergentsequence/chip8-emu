@@ -9,4 +9,4 @@ To exit click the `X` or `CTRL-C` in the terminal.
 
 1. Install SDL2
 2. Clone git repo with `git clone https://github.com/MarkoBorkovic/chip8-emu.git`
-3. Run `make` command if you are on Linux, and if you are on window lookup on how to compile SDL2 C programs
+3. Run `make` command if you are on Linux, and if you are on windows lookup on how to compile SDL2 C programs
