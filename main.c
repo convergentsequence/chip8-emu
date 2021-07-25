@@ -191,10 +191,13 @@ int main()
 	int sub;
 
 
-	bool keycodes[16];
-	int keycode;
-	bool pressed;
+	bool 	keycodes[16];
+	int 	keycode;
+	bool 	pressed;
 	memset(keycodes, 0, 16*sizeof(bool));
+
+	bool 	block_execution = false;
+	int 	wfi_register = 0; // wait for input register
 
 	SDL_Event event;
 	for(;;){
@@ -204,13 +207,21 @@ int main()
 				keycode = event.key.keysym.scancode;
 				if(keycode >= 4 && keycode <= 9){
 					keycodes[0xA + (keycode - 4)] = true;
+					if(block_execution)
+						V[wfi_register] = 0xA + (keycode - 4);
 				}
 				if(keycode >= 30 && keycode <= 38){
 					keycodes[1+(keycode - 30)] = true;
+					if(block_execution)
+						V[wfi_register] = 1+(keycode - 30);
 				}
 				if(keycode == 39){
 					keycodes[0] = true;
+					if(block_execution)
+						V[wfi_register] = 0;
 				}
+
+				block_execution = false;
 				break;
 			case SDL_KEYUP:
 				keycode = event.key.keysym.scancode;
@@ -230,7 +241,7 @@ int main()
 		}		
 		
 		currentCycleTime = SDL_GetTicks();
-		if(currentCycleTime - lastCycleTime >= 1000/cycles_per_second){
+		if(currentCycleTime - lastCycleTime >= 1000/cycles_per_second && !block_execution){
 			opcode = memory[PC] << 8 | memory[PC+1];
 			if(!opcode){
 				printf("Exiting, PC: %d, OPCODE: 0x%4X\n", PC, opcode);
@@ -412,32 +423,8 @@ int main()
 
 				case 0x0A: // 0xFx0A - Wait for key press store the value of the key in Vx
 					verbose_opcode(PC, opcode, "Waiting for key press and storing the value of key in V%d", (opcode & 0xF00) / 0x100);
-					pressed = false;
-					while(!pressed){
-						while(SDL_PollEvent(&event)){
-							switch(event.type){
-							case SDL_KEYDOWN:
-								keycode = event.key.keysym.scancode;
-								if(keycode >= 4 && keycode <= 9){
-									V[(opcode & 0xF00) / 0x100] = 0xA + keycode - 4;
-									pressed = true;
-								}
-								if(keycode >= 30 && keycode <= 38){
-									V[(opcode & 0xF00) / 0x100] = 1 + (keycode - 30);
-									pressed = true;
-								}
-								if(keycode == 39){
-									V[(opcode & 0xF00) / 0x100]  = 0;
-									pressed = true;
-								}
-								break;
-							case SDL_QUIT:
-								exit_emu();
-							}
-						}
-						SDL_Delay(0);
-					}
-
+					wfi_register = (opcode & 0xF00) / 0x100;
+					block_execution = true;
 					break;
 				
 				case 0x15: // 0xFx15 - Set delay timer to value of Vx
