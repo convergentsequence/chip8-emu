@@ -193,7 +193,6 @@ int main()
 
 	bool 	keycodes[16];
 	int 	keycode;
-	bool 	pressed;
 	memset(keycodes, 0, 16*sizeof(bool));
 
 	bool 	block_execution = false;
