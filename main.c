@@ -15,7 +15,7 @@
 
 #define GBUFF_SIZE 32*64
 
-#define VERBOSE_OPCODES 0
+#define VERBOSE_OPCODES 1
 
 SDL_Window *window;
 SDL_Renderer *renderer;
@@ -118,10 +118,12 @@ static inline void verbose_opcode(_16B PC, _16B opcode, char* message, ...){
 	#endif
 }
 
+
+
 int main()
 {
 
-	srand(0);
+	srand(time(NULL));
 
 	_8B	memory[4096];	 	
 	_16B 	opcode;			
@@ -168,7 +170,7 @@ int main()
 
 	if(!init_graphics())
 		return 1;
-
+	
 
 	PC = 0x200;
 	opcode = 0;
@@ -177,7 +179,7 @@ int main()
 	I = 0;
 
 
-	int cycles_per_second = 500;
+	int cycles_per_second = 144;
 	Uint32 lastCycleTime = 0;
 	Uint32 currentCycleTime;
 
@@ -185,8 +187,10 @@ int main()
 	int sy;
 	int sn;
 
-	bool keystates[16];
-	memset(keystates, 0, 16 * sizeof(bool));
+
+
+	int pixel;
+
 
 	SDL_Event event;
 	for(;;){
@@ -240,7 +244,7 @@ int main()
 			
 			case 0x4000: // 0x4XRR - skip next intruction if V[X] != 0xRR
 				verbose_opcode(PC, opcode, "Skipping next instruction if V%d != %X",  (opcode & 0xF00) / 0x100 ,  (opcode & 0xFF)); 
-				PC += 2 * ( V[ (opcode & 0xF00) / 100 ] != (opcode & 0xFF)  );
+				PC += 2 * ( V[ (opcode & 0xF00) / 0x100 ] != (opcode & 0xFF)  );
 				break;
 			
 			case 0x5000: // 0x5XY0 - skip next instruction if V[X] == V[Y]
@@ -279,13 +283,14 @@ int main()
 				case 4: // 0x8XY4 - Add VY to VX store carry in V15
 					verbose_opcode(PC, opcode, "Adding V%d to V%d and storing the carry in V15", (opcode & 0xF0) / 0x10, (opcode & 0xF00) / 0x100);
 					int sum = V[ (opcode & 0xF00) / 0x100 ] + V[ (opcode & 0xF0) / 0x10 ];
-					V[15] = sum > 255 ? sum - 255 : 0;
+					V[15] = sum > 255;
+					printf("Carry: %d\n",V[15]);
 					V[ (opcode & 0xF00) / 0x100 ]  = sum;
 					break;
 				case 5: // 0x8XY5 - Subtract VY from VX and store the borrow in V15
 					verbose_opcode(PC, opcode, "Subtracting V%d from V%d and storing the borrow in V15", (opcode & 0xF0) / 0x10, (opcode & 0xF00) / 0x100);
 					int sub =  V[ (opcode & 0xF00) / 0x100 ] - V[ (opcode & 0xF0) / 0x10];
-					V[15] = sub < 0;
+					V[15] = sub <= 0;
 					V[ (opcode & 0xF00) / 0x100 ] = sub;
 					break;
 				case 6: // 0x8X06 - Shift VX to right, first bit goes to V[15]
@@ -314,7 +319,7 @@ int main()
 				I = opcode & 0xFFF;
 				break;
 			
-			case 0xB000: // 0xBNNN - Jump to address NN plus register V0
+			case 0xB000: // 0xBNNN - Jump to address NNN plus register V0
 				verbose_opcode(PC, opcode, "Jumping to address %03X + V0", opcode & 0xFFF);
 				PC = (opcode & 0xFFF) + V[0];
 				break;
@@ -337,20 +342,44 @@ int main()
 			*/
 
 			case 0xD000: 
-				verbose_opcode(PC, opcode, "Drawing sprite with length %d memory location %X at coordinates %d %d", opcode & 0xF, I ,(opcode & 0xF00) / 0x100, (opcode & 0xF0) / 0x10);
+				verbose_opcode(PC, opcode, "Drawing sprite with length %d memory location %X at coordinates %d %d", opcode & 0xF, I ,V[(opcode & 0xF00) / 0x100], V[(opcode & 0xF0) / 0x10]);
 				
-				sx = (opcode & 0xF00) / 0x100;
-				sy = (opcode & 0xF0) / 0x10;
+				/*sx = V[(opcode & 0xF00) / 0x100];
+				sy = V[(opcode & 0xF0) / 0x10];
 				sn = opcode & 0xF;
+				V[15] = 0;
+				printf("%d\n", sy*64 + sx); 
 
 				for(int i = 0; i < sn; i++){
-					_8B sprite_line = memory[I+i*8];
+					_8B sprite_line = memory[I+i];
 					for(int j = 0; j < 8; j++){
-						int ploc = ((sy+i) % 32)*64+((sx+j) % 64);
-						V[15] = gbuff[ploc] == ((sprite_line >> (7-j)) & 1);
-						gbuff[ploc] ^= 1;
-					}	
+						pixelLoc = (sy+i)*64+sx+j;
+						printf("(%d+%d)*64+%d+%d=%d\n",sy,i,sx,j,pixelLoc);
+						printf("%d %d ", (sy+i)*64, sx+j);
+						gbuff[(sy+i)*64+sx+j] ^= (sprite_line >> j) & 1; 
+						if(!gbuff[(sy+i)*64+sx+j])
+							V[15] = 1;
+
+					}
+					printf("\n");
 				}
+				printf("\n----------\n");
+				*/
+
+				sx = V[(opcode & 0x0F00) >> 8];
+               			sy = V[(opcode & 0x00F0) >> 4];
+                		sn = opcode & 0x000F;
+                		V[15] &= 0;
+
+                		for(int i = 0; i < sn; i++){
+                    			pixel = memory[I + i];
+                    			for(int j = 0; j < 8; j++){
+                        			if(pixel & (0b10000000 >> j)){
+                                			V[15] = gbuff[j+sx+(i+sy)*64];
+                            				gbuff[j+sx+(i+sy)*64] ^= 1;
+                        			}
+                    			}
+                		}
 
 				break;
 
@@ -361,6 +390,7 @@ int main()
 					break;	
 				case 0xA1: // 0xExA1 - skip next instruction if key in Vx is not pressed
 					verbose_opcode(PC, opcode, "Skip the next instruction if the key in V%d (%X) is not pressed",  (opcode & 0xF00) / 0x100, V[(opcode & 0xF00) / 0x100] );
+					PC += 2;
 					break;
 				}
 				break;
@@ -392,25 +422,31 @@ int main()
 					break;
 
 				case 0x29: // 0xFx29 - the value of I is set to sprite location of digit Vx
-					verbose_opcode(PC, opcode, "I is set to sprite location of %X", (opcode & 0x100) / 0x100);
-					I = memory[((opcode & 0x100) / 0x100) * 5];
+					verbose_opcode(PC, opcode, "I is set to sprite location of %X", (opcode & 0xF00) / 0x100);
+					I = V[((opcode & 0xF00) / 0x100)] * 5;
 					break;
 				
 				case 0x33: // 0xFx33 - store BCD represebtation of Vx in I
-					verbose_opcode(PC, opcode, "Storing BCD of V%d in I", (opcode & 0x100) / 0x100);
+					verbose_opcode(PC, opcode, "Storing BCD of V%d in I", (opcode & 0xF00) / 0x100);
 					memory[I] = V[ (opcode & 0xF00) / 0x100 ] / 100;
-					memory[I+1] = (V[ (opcode & 0xF00) / 0x100 ] % 100) / 10;
+					memory[I+1] = (V[ (opcode & 0xF00) / 0x100 ] / 10) % 10;
 					memory[I+2] =  V[ (opcode & 0xF00) / 0x100 ] % 10;
 					break;
 				
 				case 0x55: // 0xFx55 - store the value of registers 0 to X into memory at I
 					verbose_opcode(PC, opcode, "Store the value of registers V0 to V%d into memory at I", (opcode & 0xF00) / 0x100);
-					memcpy(memory, V, sizeof(_8B) * ((opcode & 0xF00) / 0x100));
+					for(int i = 0; i <=((opcode & 0xF00) / 0x100); i++){
+						memory[I+i] = V[i];
+						printf("memory[%d] = V[%d] (%d)\n", I+i,i, V[i]);
+					}
 					break;
 				
-				case 0x65: // 0xFx65
+				case 0x65: // 0xFx65 load registers from V0 to VX from location I
 					verbose_opcode(PC, opcode, "Read registers V0 to V%d from I", (opcode & 0xF00) / 0x100);
-					memcpy(V, memory, sizeof(_8B) * ((opcode & 0xF00) / 0x100));
+					for(int i = 0; i <=((opcode & 0xF00) / 0x100); i++){
+						 V[i] = memory[I+i];
+						 printf("V[%d] = memory[%d] (%d)\n", i, I+i, memory[I+i]);
+					}
 					break;
 				}
 				
