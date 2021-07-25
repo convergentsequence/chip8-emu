@@ -191,10 +191,38 @@ int main()
 	int sub;
 
 
+	bool keycodes[16];
+	int keycode;
+	memset(keycodes, 0, 16*sizeof(bool));
+
 	SDL_Event event;
 	for(;;){
 		while(SDL_PollEvent(&event)){
 			switch(event.type){
+			case SDL_KEYDOWN:
+				keycode = event.key.keysym.scancode;
+				if(keycode >= 4 && keycode <= 9){
+					keycodes[0xA + (keycode - 4)] = true;
+				}
+				if(keycode >= 30 && keycode <= 38){
+					keycodes[1+(keycode - 30)] = true;
+				}
+				if(keycode == 39){
+					keycodes[0] = true;
+				}
+				break;
+			case SDL_KEYUP:
+				keycode = event.key.keysym.scancode;
+				if(keycode >= 4 && keycode <= 9){
+					keycodes[0xA + (keycode - 4)] = false;
+				}
+				if(keycode >= 30 && keycode <= 38){
+					keycodes[1+(keycode - 30)] = false;
+				}
+				if(keycode == 39){
+					keycodes[0] = false;
+				}
+				break;
 			case SDL_QUIT:
 				exit_emu();
 			}		
@@ -290,7 +318,6 @@ int main()
 					sub =  V[ (opcode & 0xF00) / 0x100 ] - V[ (opcode & 0xF0) / 0x10];
 					V[15] = sub >= 0;
 					V[ (opcode & 0xF00) / 0x100 ] = sub;
-					printf("Result: %d, borrow: %d\n", V[ (opcode & 0xF00) / 0x100 ], V[15]); 
 					break;
 				case 6: // 0x8X06 - Shift VX to right, first bit goes to V[15]
 					verbose_opcode(PC, opcode, "Shiting V%d to the right, storing 1st bit in V15", (opcode & 0xF00) / 0x100);
@@ -365,10 +392,13 @@ int main()
 				switch(opcode & 0xFF){ // check opcode endings
 				case 0x9E: // 0xEx9E - skip next instruction if key in Vx is pressed
 					verbose_opcode(PC, opcode, "Skip next instruction if key in V%d (%X) is pressed", (opcode & 0xF00) / 0x100, V[(opcode & 0xF00) / 0x100] );
+					if(keycodes[V[ (opcode & 0xF00) / 0x100]])
+						PC += 2;
 					break;	
 				case 0xA1: // 0xExA1 - skip next instruction if key in Vx is not pressed
 					verbose_opcode(PC, opcode, "Skip the next instruction if the key in V%d (%X) is not pressed",  (opcode & 0xF00) / 0x100, V[(opcode & 0xF00) / 0x100] );
-					PC += 2;
+					if(!keycodes[V[ (opcode & 0xF00) / 0x100]])
+						PC += 2;
 					break;
 				}
 				break;
@@ -415,7 +445,6 @@ int main()
 					verbose_opcode(PC, opcode, "Store the value of registers V0 to V%d into memory at I", (opcode & 0xF00) / 0x100);
 					for(int i = 0; i <=((opcode & 0xF00) / 0x100); i++){
 						memory[I+i] = V[i];
-						printf("memory[%d] = V[%d] (%d)\n", I+i,i, V[i]);
 					}
 					break;
 				
@@ -423,7 +452,6 @@ int main()
 					verbose_opcode(PC, opcode, "Read registers V0 to V%d from I", (opcode & 0xF00) / 0x100);
 					for(int i = 0; i <=((opcode & 0xF00) / 0x100); i++){
 						 V[i] = memory[I+i];
-						 printf("V[%d] = memory[%d] (%d)\n", i, I+i, memory[I+i]);
 					}
 					break;
 				}
