@@ -179,17 +179,16 @@ int main()
 	I = 0;
 
 
-	int cycles_per_second = 144;
+	int cycles_per_second = 500;
 	Uint32 lastCycleTime = 0;
 	Uint32 currentCycleTime;
 
 	int sx;
 	int sy;
 	int sn;
-
-
-
 	int pixel;
+
+	int sub;
 
 
 	SDL_Event event;
@@ -273,8 +272,8 @@ int main()
 					V[ (opcode & 0xF00) / 0x100 ] |= V[ (opcode & 0xF0) / 0x10 ];
 					break;
 				case 2: // 0x8XY2 - add value of VY to VX
-					verbose_opcode(PC, opcode, "Add the value of V%d to V%d", (opcode & 0xF0) / 0x10, (opcode & 0xF00) / 0x100);
-					V[ (opcode & 0xF00) / 0x100 ] += V[ (opcode & 0xF0) / 0x10 ];
+					verbose_opcode(PC, opcode, "Bitwise AND the value of V%d and V%d", (opcode & 0xF0) / 0x10, (opcode & 0xF00) / 0x100);
+					V[ (opcode & 0xF00) / 0x100 ] &= V[ (opcode & 0xF0) / 0x10 ];
 					break;
 				case 3: // 0x8XY3 - XOR VY and X store in VX
 					verbose_opcode(PC, opcode, "Setting V%1$d to V%1$d XOR V%2$d", (opcode & 0xF00) / 0x100, (opcode & 0xF0) / 0x10);
@@ -284,14 +283,14 @@ int main()
 					verbose_opcode(PC, opcode, "Adding V%d to V%d and storing the carry in V15", (opcode & 0xF0) / 0x10, (opcode & 0xF00) / 0x100);
 					int sum = V[ (opcode & 0xF00) / 0x100 ] + V[ (opcode & 0xF0) / 0x10 ];
 					V[15] = sum > 255;
-					printf("Carry: %d\n",V[15]);
 					V[ (opcode & 0xF00) / 0x100 ]  = sum;
 					break;
 				case 5: // 0x8XY5 - Subtract VY from VX and store the borrow in V15
 					verbose_opcode(PC, opcode, "Subtracting V%d from V%d and storing the borrow in V15", (opcode & 0xF0) / 0x10, (opcode & 0xF00) / 0x100);
-					int sub =  V[ (opcode & 0xF00) / 0x100 ] - V[ (opcode & 0xF0) / 0x10];
-					V[15] = sub <= 0;
+					sub =  V[ (opcode & 0xF00) / 0x100 ] - V[ (opcode & 0xF0) / 0x10];
+					V[15] = sub >= 0;
 					V[ (opcode & 0xF00) / 0x100 ] = sub;
+					printf("Result: %d, borrow: %d\n", V[ (opcode & 0xF00) / 0x100 ], V[15]); 
 					break;
 				case 6: // 0x8X06 - Shift VX to right, first bit goes to V[15]
 					verbose_opcode(PC, opcode, "Shiting V%d to the right, storing 1st bit in V15", (opcode & 0xF00) / 0x100);
@@ -300,9 +299,10 @@ int main()
 					break;
 				case 7: // 0x8XY7 - Subtract VX from VY result stored in VX
 					verbose_opcode(PC, opcode, "Subtracting V%d from V%d storing the borrow in V15", (opcode & 0xF00) / 0x100, (opcode & 0xF0) / 0x10);
-					int sub_2 = V[ (opcode & 0xF0) / 0x10 ] - V[ (opcode & 0xF00) / 0x100 ];
-					V[15] = sub_2 < 0;
-					V[ (opcode & 0xF00) / 0x100 ] = sub_2;
+					sub = V[ (opcode & 0xF0) / 0x10 ] - V[ (opcode & 0xF00) / 0x100 ];
+					V[15] = sub >= 0;
+					V[ (opcode & 0xF00) / 0x100 ] = sub;
+					printf("Result: %d, borrow: %d\n", V[ (opcode & 0xF00) / 0x100 ], V[15]); 
 					break;
 				case 0xE: // 0x8X0E - Shift VX to left,most significant bit goes to V15
 					verbose_opcode(PC, opcode, "Shifting VX to left storing the most significant bit in V15", (opcode & 0xF00) / 0x100);
@@ -344,28 +344,6 @@ int main()
 			case 0xD000: 
 				verbose_opcode(PC, opcode, "Drawing sprite with length %d memory location %X at coordinates %d %d", opcode & 0xF, I ,V[(opcode & 0xF00) / 0x100], V[(opcode & 0xF0) / 0x10]);
 				
-				/*sx = V[(opcode & 0xF00) / 0x100];
-				sy = V[(opcode & 0xF0) / 0x10];
-				sn = opcode & 0xF;
-				V[15] = 0;
-				printf("%d\n", sy*64 + sx); 
-
-				for(int i = 0; i < sn; i++){
-					_8B sprite_line = memory[I+i];
-					for(int j = 0; j < 8; j++){
-						pixelLoc = (sy+i)*64+sx+j;
-						printf("(%d+%d)*64+%d+%d=%d\n",sy,i,sx,j,pixelLoc);
-						printf("%d %d ", (sy+i)*64, sx+j);
-						gbuff[(sy+i)*64+sx+j] ^= (sprite_line >> j) & 1; 
-						if(!gbuff[(sy+i)*64+sx+j])
-							V[15] = 1;
-
-					}
-					printf("\n");
-				}
-				printf("\n----------\n");
-				*/
-
 				sx = V[(opcode & 0x0F00) >> 8];
                			sy = V[(opcode & 0x00F0) >> 4];
                 		sn = opcode & 0x000F;
@@ -375,8 +353,8 @@ int main()
                     			pixel = memory[I + i];
                     			for(int j = 0; j < 8; j++){
                         			if(pixel & (0b10000000 >> j)){
-                                			V[15] = gbuff[j+sx+(i+sy)*64];
-                            				gbuff[j+sx+(i+sy)*64] ^= 1;
+                                			V[15] = gbuff[(j+sx)%64+((i+sy)%32)*64];
+                            				gbuff[(j+sx)%64+((i+sy)%32)*64] ^= 1;
                         			}
                     			}
                 		}
@@ -455,11 +433,10 @@ int main()
 				verbose_opcode(PC, opcode, "Unkown opcode");
 			
 			}
-
 			lastCycleTime = currentCycleTime;
 		}
 
-		
+			
 		_60hz(currentCycleTime);	
 		SDL_Delay(0);		
 	}
