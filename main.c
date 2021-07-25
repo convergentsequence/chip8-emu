@@ -193,6 +193,7 @@ int main()
 
 	bool keycodes[16];
 	int keycode;
+	bool pressed;
 	memset(keycodes, 0, 16*sizeof(bool));
 
 	SDL_Event event;
@@ -246,8 +247,7 @@ int main()
 					break;
 				case 0xEE: // 0x00EE - return from subroutine call
 					verbose_opcode(PC, opcode, "Returning from subroutine to: %03X",stack[SP-1]);
-					PC = stack[SP-1];
-					SP--;
+					PC = stack[--SP];
 					break;
 				}
 
@@ -412,6 +412,29 @@ int main()
 
 				case 0x0A: // 0xFx0A - Wait for key press store the value of the key in Vx
 					verbose_opcode(PC, opcode, "Waiting for key press and storing the value of key in V%d", (opcode & 0xF00) / 0x100);
+					pressed = false;
+					while(!pressed){
+						while(SDL_PollEvent(&event)){
+							case SDL_KEYDOWN:
+								keycode = event.key.keysym.scancode;
+								if(keycode >= 4 && keycode <= 9){
+									V[(opcode & 0xF00) / 0x100] = 0xA + keycode - 4;
+									pressed = true;
+								}
+								if(keycode >= 30 && keycode <= 38){
+									V[(opcode & 0xF00) / 0x100] = 1 + (opcode - 30);
+									pressed = true;
+								}
+								if(keycode == 39){
+									V[(opcode & 0xF00) / 0x100]  = 0;
+									pressed = true;
+								}
+								break;
+							case SDL_QUIT:
+								exit_emu();
+						}
+					}
+
 					break;
 				
 				case 0x15: // 0xFx15 - Set delay timer to value of Vx
