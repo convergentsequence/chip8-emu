@@ -320,9 +320,9 @@ int main()
 					V[ (opcode & 0xF00) / 0x100 ] = sub;
 					break;
 				case 6: // 0x8X06 - Shift VX to right, first bit goes to V[15]
-					verbose_opcode(PC, opcode, "Shiting V%d to the right, storing 1st bit in V15", (opcode & 0xF00) / 0x100);
-					V[ (opcode & 0xF00) / 0x100 ] >>= 1;
+					verbose_opcode(PC, opcode, "Shiting V%d to the right, storing 1st bit in V15", (opcode & 0xF00) / 0x100);	
 					V[15] = V[ (opcode & 0xF00) / 0x100 ] & 1;
+					V[ (opcode & 0xF00) / 0x100 ] >>= 1;
 					break;
 				case 7: // 0x8XY7 - Subtract VX from VY result stored in VX
 					verbose_opcode(PC, opcode, "Subtracting V%d from V%d storing the borrow in V15", (opcode & 0xF00) / 0x100, (opcode & 0xF0) / 0x10);
